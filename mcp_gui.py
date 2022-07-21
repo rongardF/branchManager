@@ -1,6 +1,7 @@
 
 import tkinter as tk
 from tkinter import StringVar
+from tkinter import *
 import tkinter.ttk as ttk
 from subprocess import Popen, CREATE_NEW_CONSOLE
 import git
@@ -82,8 +83,8 @@ class git_gui():
     def closed(self):
         self.run_event.set()
         self.window.destroy()
-        if self.err_win:
-            self.err_win.destroy()
+        # if self.err_win:
+        #     self.err_win.destroy()
     
     def update_setups_list(self, setups_list):
         list_of_setups=list(setups_list.values()) # convert dictionary into list
@@ -102,14 +103,12 @@ class git_gui():
         self.list_selected_setup['values']=list_of_setups 
         
     def error_print(self, err_str):
-        self.err_win=tk.Tk()
+        self.err_win=Toplevel(self.window) # create a pop up window which is child of the master window
         self.err_win.title("ERROR")
         self.err_win.resizable(False, False)
         self.err_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"icons/error_icon.ico")))
         self.err_win.protocol("WM_DELETE_WINDOW", self.closed)
-        self.lab=tk.Label(master=self.err_win, text=err_str, anchor="w")
-        self.lab.pack()
-        self.err_win.mainloop()
+        Label(master=self.err_win, text=err_str, anchor="w").pack()
         
     def warning_print(self, war_str):
         self.war_win=tk.Tk()
@@ -167,6 +166,7 @@ class git_manager(threading.Thread):
                 if new_setups != self.setups:
                     self.callback(new_setups)
                     self.setups=new_setups
+                raise ValueError()
             except:
                 err_str=traceback.format_exc()
                 self.err_callback(err_str)
