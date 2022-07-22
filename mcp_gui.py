@@ -192,15 +192,12 @@ class git_manager(threading.Thread):
     
     Methods
     -------
-    update_setups_list(setups_list)
-        Callback function to be provided for git_manager to call when
-        new test setups (branches) are detected
-    error_print(err_str)
-        Callback function to be provided for git_manager to call when 
-        an exception is encountered while running git_manager thread.
-    setup_loaded(setup_name)
-        Callback function to be provided for git_manager to call when
-        git_manager finishes loading new setup(branch)
+    get_active_setup()
+        Return the branch name which is currently checked out
+    load_setup(setup_name, callback_func=None, lock_aquired=False)
+        Switch to new branch
+    start_updating(callback, err_callback)(setup_name)
+        Setup callback functions and start git manager thread
     """
     
     def __init__(self, repo_path, run_flag, timeout):
@@ -285,10 +282,10 @@ class git_manager(threading.Thread):
         ----------
         setup_name : str
             the name of the new branch
-        callback_func : function
+        callback_func : function, optional
             reference to the callback function to be called when 
             loading new branch finishes
-        lock_aquired : boolean
+        lock_aquired : boolean, optional
             indicate if the caller already has the lock or not
         """
         if lock_aquired is False: 
