@@ -13,7 +13,7 @@ wsl_app_path=r'C:\Windows\System32\wsl.exe ~'
 sftp_path=r'explorer.exe /e,C:\Users'
 timeout=10
 
-class git_gui():
+class git_gui(tk.Tk):
     '''
     Create a GUI for MCP manager
     
@@ -43,19 +43,19 @@ class git_gui():
         run_event : threading.Event
             Event that signals when the application should shut down
         """
+        tk.Tk.__init__(self)
         self.__run_event=run_event
         self.__git_man=git_man
                
         self.__setups_list=[]
         self.__active_setup=""
         
-        self.__window=tk.Tk()
-        self.__window.protocol("WM_DELETE_WINDOW", self.__closed)
-        self.__window.title("MCP manager")
-        self.__window.resizable(False, False) # window size cannot be changed
-        self.__window.iconbitmap(os.path.join(sys.path[0],"icons/mcp_icon.ico")) # look into same folder where the script is located
+        self.protocol("WM_DELETE_WINDOW", self.__closed)
+        self.title("MCP manager")
+        self.resizable(False, False) # window size cannot be changed
+        self.iconbitmap(os.path.join(sys.path[0],"icons/mcp_icon.ico")) # look into same folder where the script is located
         
-        self.__frame=tk.Frame(master=self.__window, width=400, height=160)
+        self.__frame=tk.Frame(master=self, width=400, height=160)
         
         self.__var_selected_setup=StringVar(master=self.__frame)
         self.__var_selected_setup.set(self.__active_setup) # set the first setup as default setup
@@ -82,12 +82,11 @@ class git_gui():
         
         self.__frame.pack()
         self.__git_man.start_updating(self.update_setups_list, self.error_print)
-        self.__window.mainloop() 
         
     def __closed(self):
         # This method is called by tkinter internal functions when a shutdown is started (pressing X)
         self.__run_event.set()
-        self.__window.destroy()
+        self.destroy()
     
     def update_setups_list(self, setups_list):
         """
@@ -133,7 +132,7 @@ class git_gui():
         err_str : str
             string containing traceback of the exception
         """
-        self.__err_win=Toplevel(self.__window) # create a pop up window which is child of the master window
+        self.__err_win=Toplevel(self) # create a pop up window which is child of the master window
         self.__err_win.title("ERROR")
         self.__err_win.resizable(False, False)
         self.__err_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"icons/error_icon.ico")))
@@ -347,6 +346,7 @@ if __name__ == "__main__":
             run=threading.Event()
             git_man=git_manager(repo_path, run, timeout)
             gui_app=git_gui(git_man, run)
+            gui_app.mainloop() 
     except:
         traceback.print_exc()
         input("PRESS ENTER")
