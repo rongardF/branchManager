@@ -10,178 +10,260 @@ import sys, os, traceback
 import subprocess
 from ignore_setups import ignore_setups
 
-class load_window(threading.Thread):
-    
-    def __init__(self):  
-        super(load_window, self).__init__()
-        
-    def run(self):
-        self.window=tk.Tk()
-        self.window.resizable(False, False)
-        frame=tk.Frame(self.window, width=400, height=160)
-        frame.grid(row=0, column=0, sticky="NE")
-        label= tk.Label(self.window, text="Starting up MCP manager...", font= ('Helvetica 14 bold'))
-        label.config(anchor=tk.CENTER)
-        label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
-        #self.window.overrideredirect(1)
-        self.window.attributes('-topmost',True)
-        self.window.mainloop()
-    
-    def close(self):
-        self.window.quit()
-        #self.window.destroy()
-        print("closed")
+# define constants
+repo_path=r'C:\Users\eonrrfe\OneDrive - Ericsson\Ron\Software development\Python\temp_files\testRepo'
+wsl_app_path=r'C:\Windows\System32\wsl.exe ~'
+sftp_path=r'explorer.exe /e,C:\Users'
+timeout=10
 
 class git_gui():
     '''
     Create a GUI for MCP manager
+    
+    Creates an object which creates GUI window with labels and buttons.
+    Starts running git_manager instance and provides callback functions for
+    it. Manages the GUI.
+    
+    Methods
+    -------
+    update_setups_list(setups_list)
+        Callback function to be provided for git_manager to call when new 
+        test setups (branches) are detected
+    error_print(err_str)
+        Callback function to be provided for git_manager to call when an
+        exception is encountered while running git_manager thread.
+    setup_loaded(setup_name)
+        Callback function to be provided for git_manager to call when
+        git_manager finishes loading new setup(branch)
     '''
 
     def __init__(self, git_man, run_event): 
-        self.run_event=run_event
-        self.git_man=git_man
+        """
+        Parameters
+        ----------
+        git_man : git_manager
+            Instance of git_manager providing backend
+        run_event : threading.Event
+            Event that signals when the application should shut down
+        """
+        self.__run_event=run_event
+        self.__git_man=git_man
                
-        self.setups_list=[]
-        self.active_setup=""
+        self.__setups_list=[]
+        self.__active_setup=""
         
-        self.err_win=None # if there is an exception then this will hold the error window object
-        self.window=tk.Tk()
-        self.window.protocol("WM_DELETE_WINDOW", self.closed)
-        self.window.title("MCP manager")
-        self.window.resizable(False, False) # window size cannot be changed
-        self.window.iconbitmap(os.path.join(sys.path[0],"icons/mcp_icon.ico")) # look into same folder where the script is located
+        self.__window=tk.Tk()
+        self.__window.protocol("WM_DELETE_WINDOW", self.__closed)
+        self.__window.title("MCP manager")
+        self.__window.resizable(False, False) # window size cannot be changed
+        self.__window.iconbitmap(os.path.join(sys.path[0],"icons/mcp_icon.ico")) # look into same folder where the script is located
         
-        self.frame=tk.Frame(master=self.window, width=400, height=160)
+        self.__frame=tk.Frame(master=self.__window, width=400, height=160)
         
-        self.var_selected_setup=StringVar(master=self.frame)
-        self.var_selected_setup.set(self.active_setup) # set the first setup as default setup
-        self.var_active_setup=StringVar(master=self.frame)
-        self.var_active_setup.set(self.active_setup)
+        self.__var_selected_setup=StringVar(master=self.__frame)
+        self.__var_selected_setup.set(self.__active_setup) # set the first setup as default setup
+        self.__var_active_setup=StringVar(master=self.__frame)
+        self.__var_active_setup.set(self.__active_setup)
         
-        self.label_setup_list_title=tk.Label(master=self.frame, text="SELECT SETUP", font=('Segoe UI', 10, 'bold'))
-        self.label_setup_list_title.place(x=20,y=20)
-        self.list_selected_setup=ttk.Combobox(master=self.frame, textvariable=self.var_selected_setup, values=self.setups_list, width=30, state='disabled')
-        self.list_selected_setup.place(x=20,y=45)
+        self.__label_setup_list_title=tk.Label(master=self.__frame, text="SELECT SETUP", font=('Segoe UI', 10, 'bold'))
+        self.__label_setup_list_title.place(x=20,y=20)
+        self.__list_selected_setup=ttk.Combobox(master=self.__frame, textvariable=self.__var_selected_setup, values=self.__setups_list, width=30, state='disabled')
+        self.__list_selected_setup.place(x=20,y=45)
         
-        self.label_active_setup_title=tk.Label(master=self.frame, text="ACTIVE SETUP", font=('Segoe UI', 10, 'bold'))
-        self.label_active_setup_title.place(x=20,y=75)
-        self.label_active_setup=tk.Label(master=self.frame, textvariable=self.var_active_setup, font=('Segoe UI', 10), width=28, anchor="w") # it is empty when initialized
-        self.label_active_setup.place(x=20,y=100)
+        self.__label_active_setup_title=tk.Label(master=self.__frame, text="ACTIVE SETUP", font=('Segoe UI', 10, 'bold'))
+        self.__label_active_setup_title.place(x=20,y=75)
+        self.__label_active_setup=tk.Label(master=self.__frame, textvariable=self.__var_active_setup, font=('Segoe UI', 10), width=28, anchor="w") # it is empty when initialized
+        self.__label_active_setup.place(x=20,y=100)
         
-        self.button_load_setup=tk.Button(master=self.frame, text="Load setup", width=16, command=self.load_setup)
-        self.button_load_setup["state"]="disabled"
-        self.button_load_setup.place(x=260, y=27)
-        self.button_open_wsl=tk.Button(master=self.frame, text="Open WSL", width=16, command=self.open_wsl)
-        self.button_open_wsl.place(x=260, y=67)
-        self.button_open_sftp=tk.Button(master=self.frame, text="Open SFTP folder", width=16, command=self.open_sftp)
-        self.button_open_sftp.place(x=260, y=107)
+        self.__button_load_setup=tk.Button(master=self.__frame, text="Load setup", width=16, command=self.__load_setup)
+        self.__button_load_setup["state"]="disabled"
+        self.__button_load_setup.place(x=260, y=27)
+        self.__button_open_wsl=tk.Button(master=self.__frame, text="Open WSL", width=16, command=self.__open_wsl)
+        self.__button_open_wsl.place(x=260, y=67)
+        self.__button_open_sftp=tk.Button(master=self.__frame, text="Open SFTP folder", width=16, command=self.__open_sftp)
+        self.__button_open_sftp.place(x=260, y=107)
         
-        self.frame.pack()
-        self.git_man.start_updating(self.update_setups_list, self.error_print)
-        self.window.mainloop() 
+        self.__frame.pack()
+        self.__git_man.start_updating(self.update_setups_list, self.error_print)
+        self.__window.mainloop() 
         
-    def closed(self):
-        self.run_event.set()
-        self.window.destroy()
-        # if self.err_win:
-        #     self.err_win.destroy()
+    def __closed(self):
+        # This method is called by tkinter internal functions when a shutdown is started (pressing X)
+        self.__run_event.set()
+        self.__window.destroy()
     
     def update_setups_list(self, setups_list):
+        """
+        Callback to call when new test setups (branches) are detected
+        
+        This callback method must be provided to git_manager instance
+        which will call it whenever new branches (test setups) are 
+        found on the server. This method will update widgets in GUI
+        accordingly to show new available test setups.
+        
+        Parameters
+        ----------
+        setups_list : dict
+            dictionary containing available test setups with index 
+            number as a key
+        """
         list_of_setups=list(setups_list.values()) # convert dictionary into list
         
-        if self.var_selected_setup.get() not in list_of_setups: # if currently selected setup is not in the new list of setups
+        if self.__var_selected_setup.get() not in list_of_setups: # if currently selected setup is not in the new list of setups
             new_selected_setup=list_of_setups[0] # then it does not exist anymore, change selection to first setup in the list - actual change will be doen in the end
         else:
-            new_selected_setup=self.var_selected_setup.get()
+            new_selected_setup=self.__var_selected_setup.get()
             
-        if len(self.var_active_setup.get()) == 0: # if empty string then staring up, load the currently selected branch
-            new_selected_setup=self.git_man.get_active_setup()
+        if len(self.__var_active_setup.get()) == 0: # if empty string then staring up, load the currently selected branch
+            new_selected_setup=self.__git_man.get_active_setup()
         
-        if self.var_active_setup.get() not in list_of_setups: # if currently active setup is not in the new list of setups
-            self.load_setup(new_selected_setup) # then switch to another setup (the one currently selected)
+        if self.__var_active_setup.get() not in list_of_setups: # if currently active setup is not in the new list of setups
+            self.__load_setup(new_selected_setup) # then switch to another setup (the one currently selected)
         
-        self.list_selected_setup['values']=list_of_setups 
+        self.__list_selected_setup['values']=list_of_setups 
         
     def error_print(self, err_str):
-        self.err_win=Toplevel(self.window) # create a pop up window which is child of the master window
-        self.err_win.title("ERROR")
-        self.err_win.resizable(False, False)
-        self.err_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"icons/error_icon.ico")))
-        self.err_win.protocol("WM_DELETE_WINDOW", self.closed)
-        Label(master=self.err_win, text=err_str, anchor="w").pack()
+        """
+        Callback to call when exception is raised
         
-    def warning_print(self, war_str):
-        self.war_win=tk.Tk()
-        self.war_win.title("WARNING")
-        self.war_win.resizable(False, False)
-        self.war_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"error_icon.ico")))
-        self.war_win.protocol("WM_DELETE_WINDOW", self.closed)
-        self.lab=tk.Label(master=self.war_win, text=war_str, anchor="w")
-        self.lab.pack()
-        self.war_win.mainloop()
+        This callback method must be provided to git_manager instance
+        which will call it whenever there is an exception raised while
+        executing the thread run method. This method creates a pop-up
+        window which displays the exception message for the user.
+        
+        Parameters
+        ----------
+        err_str : str
+            string containing traceback of the exception
+        """
+        self.__err_win=Toplevel(self.__window) # create a pop up window which is child of the master window
+        self.__err_win.title("ERROR")
+        self.__err_win.resizable(False, False)
+        self.__err_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"icons/error_icon.ico")))
+        self.__err_win.protocol("WM_DELETE_WINDOW", self.__closed)
+        Label(master=self.__err_win, text=err_str, anchor="w").pack()
+        
+    # def warning_print(self, war_str):
+    #     self.war_win=tk.Tk()
+    #     self.war_win.title("WARNING")
+    #     self.war_win.resizable(False, False)
+    #     self.war_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"error_icon.ico")))
+    #     self.war_win.protocol("WM_DELETE_WINDOW", self.__closed)
+    #     self.lab=tk.Label(master=self.war_win, text=war_str, anchor="w")
+    #     self.lab.pack()
+    #     self.war_win.mainloop()
        
-    def load_setup(self, new_setup=None):
+    def __load_setup(self, new_setup=None):
+        # Internal method that is called when a new test setup (branch) needs
+        # to be loaded
         if new_setup is None:
-            selected_setup=self.var_selected_setup.get()
+            selected_setup=self.__var_selected_setup.get()
         else:
             selected_setup=new_setup
-        self.button_load_setup["state"]="disabled"
-        self.list_selected_setup["state"]="disabled"
-        threading.Thread(target=self.git_man.load_setup, args=(selected_setup, self.setup_loaded)).start() # this implemented in a thread with callback function
+        self.__button_load_setup["state"]="disabled"
+        self.__list_selected_setup["state"]="disabled"
+        threading.Thread(target=self.__git_man.load_setup, args=(selected_setup, self.setup_loaded)).start() # this implemented in a thread with callback function
     
     def setup_loaded(self, setup_name):
         """
-        Callback function which is called when setup finsihes loading.
-        """
-        self.var_active_setup.set(setup_name)
-        self.var_selected_setup.set(setup_name)
-        self.button_load_setup["state"]="normal"
-        self.list_selected_setup["state"]="readonly"
-    
-    def open_wsl(self):
-        Popen(r'C:\Windows\System32\wsl.exe ~', creationflags=CREATE_NEW_CONSOLE) # open a new WSL terminal window
+        Callback function when new setup is loaded
         
-    def open_sftp(self):
-        Popen(r'explorer.exe /e,C:\Users', creationflags=CREATE_NEW_CONSOLE)
+        This callback method must be provided to git_manager instance
+        when calling load_setup method. This callback will be called
+        once the git_manager finishes loading that setup and it is
+        ready to use.
+        
+        Parameters
+        ----------
+        setup_name : str
+            string containing the steup name that was loaded
+        """
+        self.__var_active_setup.set(setup_name)
+        self.__var_selected_setup.set(setup_name)
+        self.__button_load_setup["state"]="normal"
+        self.__list_selected_setup["state"]="readonly"
+    
+    def __open_wsl(self):
+        # Internal method to open up a WSL terminal
+        Popen(wsl_app_path, creationflags=CREATE_NEW_CONSOLE) # open a new WSL terminal window
+        
+    def __open_sftp(self):
+        # Internal method to open up FIle Explorer with SFTP folder path
+        Popen(sftp_path, creationflags=CREATE_NEW_CONSOLE)
 
 
 class git_manager(threading.Thread):
+    """
+    Backend to manage git repositories
     
-    def __init__(self, repo_path, run_flag):
-        self.repo_path=repo_path
-        os.chdir(self.repo_path)
-        self.repo=git.Repo(self.repo_path)
-        self.run_flag=run_flag
-        self.setups={}
-        self.lock=threading.Lock()
+    Manage git repositories on local machine. Tasks include retrieving
+    information about new branches in git server, pulling any changes
+    for existing branches and providing method for switching between 
+    branches. Instance of this class will run a thread that 
+    periodically checks for new branches on the git server and pull
+    any changes for the existing branches.
+    
+    Methods
+    -------
+    update_setups_list(setups_list)
+        Callback function to be provided for git_manager to call when
+        new test setups (branches) are detected
+    error_print(err_str)
+        Callback function to be provided for git_manager to call when 
+        an exception is encountered while running git_manager thread.
+    setup_loaded(setup_name)
+        Callback function to be provided for git_manager to call when
+        git_manager finishes loading new setup(branch)
+    """
+    
+    def __init__(self, repo_path, run_flag, timeout):
+        """
+        Parameters
+        ----------
+        repo_path : str
+            specify the path to the local git repository
+        run_flag : threading.Event
+            event flag to signal when user has closed GUI
+        timeout : int
+            time to wait between retrieving new information from git 
+            server
+        """
+        self.__timeout=timeout
+        self.__repo_path=repo_path
+        os.chdir(self.__repo_path) # switch to directory where the repository is located
+        self.__repo=git.Repo(self.__repo_path)
+        self.__run_flag=run_flag
+        self.__setups={}
+        self.__lock=threading.Lock()
         threading.Thread.__init__(self)
         
     def run(self):
-        while not self.run_flag.is_set():
+        # internal function for threading - this will be run when start() method is called
+        while not self.__run_flag.is_set(): # while GUI has not been closed
             try:
-                self.lock.acquire()
-                self.update_refs()
-                new_setups=self.get_setups() # get the list of all branches/setups
-                self.lock.release()
-                if new_setups != self.setups:
+                self.__lock.acquire()
+                self.__prune_refs()
+                new_setups=self.__get_setups() # get the list of all branches/setups
+                self.__lock.release()
+                if new_setups != self.__setups:
                     self.callback(new_setups)
-                    self.setups=new_setups
-                raise ValueError()
+                    self.__setups=new_setups
             except:
                 err_str=traceback.format_exc()
                 self.err_callback(err_str)
-            self.run_flag.wait(10) # we can increase this value later
+            self.__run_flag.wait(self.__timeout) # we can increase this value later
     
-    def update_refs(self):
-        # prune the origin repository of stale branches - we use subprocess because gitpython does not seem to have a direct way to prune
-        subprocess.run(["git", "remote", "prune", "origin"])
+    def __prune_refs(self):
+        # prune the origin repository of stale branches
+        subprocess.run(["git", "remote", "prune", "origin"]) # we use subprocess because gitpython does not seem to have a direct way to prune
     
-    def get_setups(self):
+    def __get_setups(self):
+        # pull any new branches or changes to existing branches
         try:
-            self.repo.remotes.origin.pull()
+            self.__repo.remotes.origin.pull()
         except git.exc.GitCommandError: # this will be raised when the branch has been deleted
             self.load_setup("main", None, True) # load main branch temporarely because we know this will never be deleted; we already have a lock and no callback func
-        branches=self.repo.refs # get all available branches form GIT server
+        branches=self.__repo.refs # get all available branches form GIT server
         setups={} # setups will be in dictionary with key being index in refs list and value being the setup name
         for branch in branches: # convert the ref objects into branch name strings
             if isinstance(branch, git.RemoteReference) and (str(branch) != "origin/HEAD"): # check if valid branch name (e.g. HEAD not valid)
@@ -189,32 +271,64 @@ class git_manager(threading.Thread):
                 if branch_name not in ignore_setups: # check if this branch we ignore
                     setups[branches.index(branch)]=branch_name
         
-        if self.get_active_setup() == "main":
+        # if we switched the main then now switch to first available branch not main
+        if self.get_active_setup() == "main" or self.get_active_setup() == "master":
             self.load_setup(list(setups.values())[0], None, True) # load first existing setup/branch
         
         return setups   # there needs to be a check to see if any new branch available
     
     def get_active_setup(self):
-        return str(self.repo.head.reference)
+        """
+        Return the branch name which is currently checked out
+        """
+        return str(self.__repo.head.reference)
     
     def load_setup(self, setup_name, callback_func=None, lock_aquired=False):
+        """
+        Switch to new branch
+        
+        Parameters
+        ----------
+        setup_name : str
+            the name of the new branch
+        callback_func : function
+            reference to the callback function to be called when 
+            loading new branch finishes
+        lock_aquired : boolean
+            indicate if the caller already has the lock or not
+        """
         if lock_aquired is False: 
-            self.lock.acquire()
-        self.update_refs()
-        branches=self.repo.refs
+            self.__lock.acquire()
+        self.__prune_refs()
+        branches=self.__repo.refs
         for branch in branches:
             branch_str=str(branch).split("/")[-1]
             if branch_str == setup_name:
-                self.repo.git.checkout(branch_str)
+                self.__repo.git.checkout(branch_str)
                 # self.repo.head.reference=branch
                 # self.repo.head.reset(index=True, working_tree=True)
                 if callback_func is not None:
                     callback_func(setup_name) # if okay then return with None
         
         if lock_aquired is False:
-            self.lock.release()
+            self.__lock.release()
         
     def start_updating(self, callback, err_callback):
+        """
+        Setup callback functions and start git manager thread
+        
+        Caller must provide two callback functions. First callback 
+        function will be called when the list of branches in git 
+        server has changed. The second callback will be called when 
+        there is an exception raised while executing the threading loop
+        
+        Parameters
+        ----------
+        callback : function
+            called when branches list changes
+        err_callback : function
+            called when exception is raised while executing
+        """
         self.callback=callback
         self.err_callback=err_callback
         self.start()
@@ -225,14 +339,13 @@ def is_running(): # this function checks if there is an MCP manager app running 
 
 if __name__ == "__main__":
     try:
-        repo_path=r'C:\Users\eonrrfe\OneDrive - Ericsson\Ron\Software development\Python\temp_files\testRepo'
         if is_running(): # if already running then don't open another app
             sys.exit()
             
         run=threading.Event()
-        git_man=git_manager(repo_path, run)
+        git_man=git_manager(repo_path, run, timeout)
         gui_app=git_gui(git_man, run)
-        
     except:
         traceback.print_exc()
         input("PRESS ENTER")
+        
