@@ -1,14 +1,14 @@
 
 import tkinter as tk
-from tkinter import StringVar
-from tkinter import *
 import tkinter.ttk as ttk
-from subprocess import Popen, CREATE_NEW_CONSOLE
 import git
 import threading
 import sys, os, traceback
 import subprocess
+
 from ignore_setups import ignore_setups
+from tkinter import *
+from subprocess import Popen, CREATE_NEW_CONSOLE
 
 # define constants
 repo_path=r'C:\Users\eonrrfe\OneDrive - Ericsson\Ron\Software development\Python\temp_files\testRepo'
@@ -305,10 +305,8 @@ class git_manager(threading.Thread):
             branch_str=str(branch).split("/")[-1]
             if branch_str == setup_name:
                 self.__repo.git.checkout(branch_str)
-                # self.repo.head.reference=branch
-                # self.repo.head.reset(index=True, working_tree=True)
                 if callback_func is not None:
-                    callback_func(setup_name) # if okay then return with None
+                    callback_func(setup_name) 
         
         if lock_aquired is False:
             self.__lock.release()
