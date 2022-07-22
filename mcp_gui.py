@@ -245,7 +245,9 @@ class git_manager(threading.Thread):
         subprocess.run(["git", "remote", "prune", "origin"]) # we use subprocess because gitpython does not seem to have a direct way to prune
     
     def __get_setups(self):
-        # pull any new branches or changes to existing branches
+        # pull any new branches or changes to existing branches, 
+        # returns a dictionary of all the branches filtered by
+        # ignore_setups list
         try:
             self.__repo.remotes.origin.pull()
         except git.exc.GitCommandError: # this will be raised when the branch has been deleted
@@ -267,6 +269,11 @@ class git_manager(threading.Thread):
     def get_active_setup(self):
         """
         Return the branch name which is currently checked out
+        
+        Returns
+        -------
+        str
+            returns a string of currently checked out branch
         """
         return str(self.__repo.head.reference)
     
@@ -319,6 +326,14 @@ class git_manager(threading.Thread):
         self.start()
         
 def is_running(): # this function checks if there is an MCP manager app running already
+    """
+    Check if MCP manager instance ia already running
+    
+    Returns
+    -------
+    boolean
+        True is running, False if not
+    """
     output = subprocess.check_output(('TASKLIST', '/FI', 'WINDOWTITLE eq MCP manager'))
     if re.search("Console", str(output)):
         return True
