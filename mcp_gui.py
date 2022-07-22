@@ -1,13 +1,10 @@
 
 import tkinter as tk
 import tkinter.ttk as ttk
-import git
-import threading
-import sys, os, traceback
-import subprocess
+import sys, os, traceback, git, re, threading, subprocess
 
 from ignore_setups import ignore_setups
-from tkinter import *
+from tkinter import messagebox, StringVar, Toplevel, Label
 from subprocess import Popen, CREATE_NEW_CONSOLE
 
 # define constants
@@ -142,16 +139,6 @@ class git_gui():
         self.__err_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"icons/error_icon.ico")))
         self.__err_win.protocol("WM_DELETE_WINDOW", self.__closed)
         Label(master=self.__err_win, text=err_str, anchor="w").pack()
-        
-    # def warning_print(self, war_str):
-    #     self.war_win=tk.Tk()
-    #     self.war_win.title("WARNING")
-    #     self.war_win.resizable(False, False)
-    #     self.war_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"error_icon.ico")))
-    #     self.war_win.protocol("WM_DELETE_WINDOW", self.__closed)
-    #     self.lab=tk.Label(master=self.war_win, text=war_str, anchor="w")
-    #     self.lab.pack()
-    #     self.war_win.mainloop()
        
     def __load_setup(self, new_setup=None):
         # Internal method that is called when a new test setup (branch) needs
@@ -332,17 +319,22 @@ class git_manager(threading.Thread):
         self.start()
         
 def is_running(): # this function checks if there is an MCP manager app running already
-    # needs to be implmented yet
-    return False
+    output = subprocess.check_output(('TASKLIST', '/FI', 'WINDOWTITLE eq MCP manager'))
+    if re.search("Console", str(output)):
+        return True
+    else:
+        return False
 
 if __name__ == "__main__":
     try:
         if is_running(): # if already running then don't open another app
-            sys.exit()
-            
-        run=threading.Event()
-        git_man=git_manager(repo_path, run, timeout)
-        gui_app=git_gui(git_man, run)
+            info_win=tk.Tk()
+            info_win.withdraw()
+            messagebox.showinfo(title=None,message="MCP manager already running!")
+        else: 
+            run=threading.Event()
+            git_man=git_manager(repo_path, run, timeout)
+            gui_app=git_gui(git_man, run)
     except:
         traceback.print_exc()
         input("PRESS ENTER")
