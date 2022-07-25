@@ -50,7 +50,7 @@ class git_gui(tk.Tk):
         self.__setups_list=[]
         self.__active_setup=""
         
-        self.protocol("WM_DELETE_WINDOW", self.__closed)
+        self.protocol("WM_DELETE_WINDOW", self.__closed_std)
         self.title("MCP manager")
         self.resizable(False, False) # window size cannot be changed
         self.iconbitmap(os.path.join(sys.path[0],"icons/mcp_icon.ico")) # look into same folder where the script is located
@@ -83,10 +83,14 @@ class git_gui(tk.Tk):
         self.__frame.pack()
         self.__git_man.start_updating(self.update_setups_list, self.error_print)
         
-    def __closed(self):
-        # This method is called by tkinter internal functions when a shutdown is started (pressing X)
+    def __closed_std(self):
         self.__run_event.set()
         self.destroy()
+        
+    def __closed_err(self):
+        # This method is called by tkinter internal functions when a shutdown is started (pressing X)
+        self.__run_event.set()
+        self.quit()
     
     def update_setups_list(self, setups_list):
         """
@@ -132,12 +136,8 @@ class git_gui(tk.Tk):
         err_str : str
             string containing traceback of the exception
         """
-        self.__err_win=Toplevel(self) # create a pop up window which is child of the master window
-        self.__err_win.title("ERROR")
-        self.__err_win.resizable(False, False)
-        self.__err_win.iconbitmap(os.path.join(os.path.join(sys.path[0],"icons/error_icon.ico")))
-        self.__err_win.protocol("WM_DELETE_WINDOW", self.__closed)
-        Label(master=self.__err_win, text=err_str, anchor="w").pack()
+        messagebox.showerror(title="Exception raised",message=err_str)
+        self.__closed_err()
        
     def __load_setup(self, new_setup=None):
         # Internal method that is called when a new test setup (branch) needs
