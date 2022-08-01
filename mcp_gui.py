@@ -84,11 +84,12 @@ class git_gui(tk.Tk):
         self.__git_man.start_updating(self.update_setups_list, self.error_print)
         
     def __closed_std(self):
+        # This method is called by tkinter internal functions when a shutdown is started (pressing X)
         self.__run_event.set()
         self.destroy()
         
     def __closed_err(self):
-        # This method is called by tkinter internal functions when a shutdown is started (pressing X)
+        # This method is called by tkinter internal functions when a shutdown is started by error handler
         self.__run_event.set()
         self.quit()
     
