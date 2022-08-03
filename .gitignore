@@ -129,5 +129,3 @@ dmypy.json
 .pyre/
 /.project
 /.pydevproject
-/MCP.vbs
-/startup.bat
