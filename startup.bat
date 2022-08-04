@@ -1,1 +1,0 @@
-python mcp_gui.py

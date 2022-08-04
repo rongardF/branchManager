@@ -2,7 +2,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import sys, os, traceback, git, re, threading, subprocess
 
-from ignore_setups import ignore_setups
+#from ignore_setups import ignore_setups
 from tkinter import messagebox, StringVar, Toplevel, simpledialog
 from subprocess import Popen, CREATE_NEW_CONSOLE
 from configparser import ConfigParser
@@ -523,6 +523,16 @@ if __name__ == "__main__":
             info_win.withdraw()
             messagebox.showinfo(title=None,message="MCP manager already running!")
         else: 
+            # read setup names which should be ignored
+            ignore_setups=[]
+            with open(os.path.join(sys.path[0],'ignore_setups'), "r") as f:
+                while True:
+                    line=f.readline()
+                    if not line:
+                        break
+                    else:
+                        ignore_setups.append(line.split()[0])
+            # read settings
             settings=SettingsHandler()
             input_win=tk.Tk() # root object in case we need to create input or error windows
             input_win.withdraw() # make it invisible
